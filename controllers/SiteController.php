@@ -2,42 +2,15 @@
 
 namespace app\controllers;
 
+use app\components\ExportForm;
+use app\components\UploadForm;
+use app\models\Results;
 use Yii;
-use yii\filters\AccessControl;
 use yii\web\Controller;
-use yii\web\Response;
-use yii\filters\VerbFilter;
-use app\models\LoginForm;
-use app\models\ContactForm;
+use yii\web\UploadedFile;
 
 class SiteController extends Controller
 {
-    /**
-     * @inheritdoc
-     */
-    public function behaviors()
-    {
-        return [
-            'access' => [
-                'class' => AccessControl::className(),
-                'only' => ['logout'],
-                'rules' => [
-                    [
-                        'actions' => ['logout'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                    ],
-                ],
-            ],
-            'verbs' => [
-                'class' => VerbFilter::className(),
-                'actions' => [
-                    'logout' => ['post'],
-                ],
-            ],
-        ];
-    }
-
     /**
      * @inheritdoc
      */
@@ -46,11 +19,7 @@ class SiteController extends Controller
         return [
             'error' => [
                 'class' => 'yii\web\ErrorAction',
-            ],
-            'captcha' => [
-                'class' => 'yii\captcha\CaptchaAction',
-                'fixedVerifyCode' => YII_ENV_TEST ? 'testme' : null,
-            ],
+            ]
         ];
     }
 
@@ -61,66 +30,41 @@ class SiteController extends Controller
      */
     public function actionIndex()
     {
-        return $this->render('index');
-    }
+        $model = new UploadForm();
 
-    /**
-     * Login action.
-     *
-     * @return Response|string
-     */
-    public function actionLogin()
-    {
-        if (!Yii::$app->user->isGuest) {
-            return $this->goHome();
+        if (Yii::$app->request->isPost) {
+            $model->dumps = UploadedFile::getInstances($model, 'dumps');
+            if (!$model->upload()) {
+                Yii::$app->session->setFlash('upload', 'Sorry, some dumps can not be uploaded');
+            } else {
+                Yii::$app->response->redirect('/site/export');
+            }
         }
 
-        $model = new LoginForm();
-        if ($model->load(Yii::$app->request->post()) && $model->login()) {
-            return $this->goBack();
-        }
-        return $this->render('login', [
-            'model' => $model,
-        ]);
+        return $this->render('index', ['model' => $model]);
     }
 
     /**
-     * Logout action.
-     *
-     * @return Response
-     */
-    public function actionLogout()
-    {
-        Yii::$app->user->logout();
-
-        return $this->goHome();
-    }
-
-    /**
-     * Displays contact page.
-     *
-     * @return Response|string
-     */
-    public function actionContact()
-    {
-        $model = new ContactForm();
-        if ($model->load(Yii::$app->request->post()) && $model->contact(Yii::$app->params['adminEmail'])) {
-            Yii::$app->session->setFlash('contactFormSubmitted');
-
-            return $this->refresh();
-        }
-        return $this->render('contact', [
-            'model' => $model,
-        ]);
-    }
-
-    /**
-     * Displays about page.
-     *
      * @return string
      */
-    public function actionAbout()
+    public function actionExport()
     {
-        return $this->render('about');
+        $directory = \Yii::getAlias('@webroot') . '/db';
+        $files = array_diff(scandir($directory), array('..', '.'));
+        $dumps = [];
+        foreach ($files as $file) {
+            $dumps[$file] = $file;
+        }
+
+        $model = new ExportForm();
+        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+            $results = $model->export();
+            Yii::$app->session->setFlash('results-count', count($results));
+        }
+
+        return $this->render('export', [
+            'model' => $model,
+            'dumps' => $dumps
+        ]);
     }
 }
