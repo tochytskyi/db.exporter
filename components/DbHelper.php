@@ -2,6 +2,7 @@
 
 namespace app\components;
 
+use app\models\Results;
 use app\models\WpPosts;
 use SimpleXMLElement;
 use Yii;
@@ -11,20 +12,48 @@ class DbHelper extends Component
 {
 
     /**
+     * Clear DB
+     */
+    public static function clearDb()
+    {
+        $tables = Yii::$app->db->schema->getTableNames();
+        foreach ($tables as $table) {
+            if ($table !== Results::tableName()) {
+                Yii::$app->db->createCommand("DROP TABLE IF EXISTS {$table}")->execute();
+            }
+        }
+
+        Yii::$app->cache->flush();
+        Yii::$app->db->schema->refresh();
+    }
+
+    /**
      * Dump one sql file
      * @param $fileName
      * @param $dump
      */
     public static function executeDump($fileName, $dump)
     {
+        self::clearDb();
         Yii::$app->db->createCommand(file_get_contents($fileName))->execute();
 
-        $posts = WpPosts::find()->all();
+        $posts = [];
+        $tables = Yii::$app->db->schema->getTableNames();
+        foreach ($tables as $table) {
+            if (strpos($table, '_posts') !== false) {
+                $posts = (new \yii\db\Query())
+                    ->select(['*'])
+                    ->from($table)
+                    ->all();
+                break;
+            }
+        }
+
         $results = [];
         foreach ($posts as $post) {
             $results[] = [
-                self::clearHtmlTags($post->post_title),
-                self::clearHtmlTags($post->post_content),
+                self::clearHtmlTags($post['post_title']),
+                self::clearHtmlTags($post['post_content']),
                 $dump
             ];
         }
@@ -32,18 +61,20 @@ class DbHelper extends Component
         Yii::$app
             ->db
             ->createCommand()
-            ->batchInsert('results', ['post_title', 'post_content', 'dump_name'], $results)
+            ->batchInsert(Results::tableName(), ['post_title', 'post_content', 'dump_name'], $results)
             ->execute();
     }
 
     /**
-     * Clear text from HTML tags
+     * Clear text from HTML tags (img,a)
      * @param $text
      * @return string
      */
     public static function clearHtmlTags($text)
     {
-        return strip_tags($text, '<br><p><b><u><i><h1><h2><h3><h4><h5><h6>');
+        $text = preg_replace("/<img[^>]+\>/i", " ", $text);
+        $text = preg_replace('#<a.*?>(.*?)</a>#i', '\1', $text);
+        return $text;
     }
 
     /**

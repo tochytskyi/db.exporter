@@ -4,7 +4,6 @@ namespace app\components;
 
 use app\models\Results;
 use yii\base\Model;
-use yii\web\UploadedFile;
 
 class ExportForm extends Model
 {
@@ -14,13 +13,14 @@ class ExportForm extends Model
     static $exportFormatList = [
         'csv' => 'csv',
         'xml' => 'xml',
-        'txt' => 'text'
+        'txt' => 'txt'
     ];
 
     public function rules()
     {
         return [
             ['exportFormat', 'required'],
+            [['exportFormat'], 'in', 'range' => array_values(self::$exportFormatList)],
             [['dumps'], 'safe'],
         ];
     }
@@ -39,7 +39,7 @@ class ExportForm extends Model
 
         $results = Results::find()->all();
 
-        //clear db buffer
+        //clear all results
         Results::deleteAll();
 
         switch ($this->exportFormat) {
@@ -48,11 +48,29 @@ class ExportForm extends Model
                 break;
             case 'xml':
                 return DbHelper::exportXML($results);
+                break;
             case 'txt':
                 return DbHelper::exportTXT($results);
+                break;
         }
 
         return $results;
+    }
+
+    /**
+     * Create existing dumps list
+     * @return array
+     */
+    public static function getDumpsList()
+    {
+        $directory = \Yii::getAlias('@webroot') . '/db';
+        $files = array_diff(scandir($directory), array('..', '.'));
+        $dumps = [];
+        foreach ($files as $file) {
+            $dumps[$file] = $file;
+        }
+
+        return $dumps;
     }
 
 }

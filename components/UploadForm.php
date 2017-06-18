@@ -28,7 +28,6 @@ class UploadForm extends Model
     {
         if ($this->validate()) {
             foreach ($this->dumps as $file) {
-
                 if ($file->extension !== 'sql') {
                     $this->addError('dumps', $file->baseName . '.' . $file->extension . ' is not an SQL dump');
                     return false;

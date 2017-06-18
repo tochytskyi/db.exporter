@@ -2,6 +2,7 @@
 
 namespace app\controllers;
 
+use app\components\DbHelper;
 use app\components\ExportForm;
 use app\components\UploadForm;
 use app\models\Results;
@@ -49,13 +50,6 @@ class SiteController extends Controller
      */
     public function actionExport()
     {
-        $directory = \Yii::getAlias('@webroot') . '/db';
-        $files = array_diff(scandir($directory), array('..', '.'));
-        $dumps = [];
-        foreach ($files as $file) {
-            $dumps[$file] = $file;
-        }
-
         $model = new ExportForm();
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
             $results = $model->export();
@@ -64,7 +58,16 @@ class SiteController extends Controller
 
         return $this->render('export', [
             'model' => $model,
-            'dumps' => $dumps
+            'dumps' => ExportForm::getDumpsList()
         ]);
+    }
+
+    /**
+     * Clear Dumps
+     */
+    public function actionClearDumps()
+    {
+        array_map('unlink', glob(Yii::getAlias('@webroot') . '/db/*'));
+        Yii::$app->response->redirect('/site/export');
     }
 }

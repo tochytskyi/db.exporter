@@ -35,6 +35,7 @@ $this->title = 'Export';
                 ])->label('Select one or more dumps to import');
             ?>
             <?= Html::submitButton('Export', ['class' => 'btn btn-primary']) ?>
+            <a class="btn" href="/site/clear-dumps">Clear dumps</a>
             <?php ActiveForm::end() ?>
         </div>
     </div>
